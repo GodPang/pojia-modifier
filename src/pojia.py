@@ -23,7 +23,6 @@
 
 import base64
 import binascii
-import concurrent.futures
 import datetime
 import hashlib
 import io
@@ -9392,11 +9391,14 @@ def do_status_json(ctx, targets):
                        "hit": 0, "total": 0, "stale": False}
 
     try:
-        with concurrent.futures.ThreadPoolExecutor(
+        # 延迟导入：打包时 PyInstaller 靠 AST 扫出来的模块名补 hidden-import，
+        # 万一这一条漏了，失败的也只是「慢一点」，不该让整个程序起不来。
+        import concurrent.futures as _cf
+        with _cf.ThreadPoolExecutor(
                 max_workers=min(8, len(each) or 1)) as pool:
             for fut in [pool.submit(work, i, t) for i, t in enumerate(each)]:
                 fut.result()
-    except (RuntimeError, OSError):
+    except (ImportError, RuntimeError, OSError):
         # 线程池起不来（极少见）就老实串行
         for i, t in enumerate(each):
             work(i, t)
