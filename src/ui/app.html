@@ -71,7 +71,7 @@
 
   <section class="hero">
     <h1>解锁 AI 编程工具被藏起来的能力</h1>
-    <p class="lede">勾选你用到的软件，点一下「一键破甲」就行。没装的会自动跳过，改错了随时能还原。</p>
+    <p class="lede">勾选你用到的软件，点「先检测一下」看每行的现状，再点「一键破甲」补上。没装的自动跳过，改错了随时能还原。</p>
     <div class="cta">
       <button type="button" class="btn primary lg" id="go">一键破甲</button>
       <button type="button" class="btn" id="detect">先检测一下（只看不改）</button>
@@ -116,7 +116,8 @@
       <div class="foot">
         <button type="button" class="link" id="all">全选</button>
         <button type="button" class="link" id="none">全不选</button>
-        <span class="tip">没装的会跳过</span>
+        <button type="button" class="link" id="rescan">刷新状态</button>
+        <span class="tip" id="scan-tip">没装的会跳过</span>
       </div>
     </div>
 
@@ -208,6 +209,13 @@
           <span class="track" aria-hidden="true"></span>
           <span class="txt">启动时检查更新
             <span>只提示，不自己装。关掉之后就是完全不查。</span>
+          </span>
+        </label>
+        <label class="switchrow" for="set-scan">
+          <input type="checkbox" id="set-scan">
+          <span class="track" aria-hidden="true"></span>
+          <span class="txt">启动时自检
+            <span>打开界面就扫一遍各软件的现状，软件列表里直接标出「已破甲 / 部分破甲 / 未破甲」。扫盘要几秒，默认关。</span>
           </span>
         </label>
       </div>

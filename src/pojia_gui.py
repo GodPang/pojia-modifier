@@ -143,6 +143,7 @@ _UPDATE_LINE = re.compile(
     r"最新发布：\s*([0-9][0-9.]*(?:-(?:alpha|beta|mod))?)")
 _UPDATE_JSON = "#update "
 _SETTINGS_JSON = "#settings "
+_STATUS_JSON = "#status "
 # 一条流结束前补上的退出码。前端只认这个前缀，用它判断成败，不显示。
 # 为什么另发而不是看最后一行：只读动作（体检）本来就会打 [!] 提示，按字样判会误报。
 EXIT_SENTINEL = "__POJIA_EXIT__:"
@@ -246,7 +247,50 @@ def read_settings(spec=""):
     if data:
         return data
     return {"version": core_version(), "channel": _channel_of(core_version()),
-            "auto_check": True, "channels": [], "note": "读不到设置"}
+            "auto_check": True, "auto_scan": False, "channels": [],
+            "note": "读不到设置"}
+
+
+def _grab_list(text, prefix):
+    """跟 _grab_json 一样，只是后面跟的是数组。"""
+    for line in text.splitlines():
+        line = line.strip()
+        if line.startswith(prefix):
+            try:
+                data = json.loads(line[len(prefix):])
+            except ValueError:
+                continue
+            if isinstance(data, list):
+                return data
+    return None
+
+
+def scan_targets(timeout=90):
+    """问核心要每个软件的现状。
+
+    扫盘比读一行 JSON 慢：二十个目标各自要 resolve 一遍（进程反推 + 盘符扫描），
+    得给足时间。返回按前端要的字段裁好的列表，读不到就是空列表 ——
+    界面那边拿到空列表就当「还没扫过」，不会编造状态。
+    """
+    text = _run_core(["--status-json"], timeout=timeout)
+    rows = _grab_list(text, _STATUS_JSON)
+    if not rows:
+        return []
+    out = []
+    for r in rows:
+        if not isinstance(r, dict):
+            continue
+        out.append({
+            "key": str(r.get("key") or ""),
+            "name": str(r.get("name") or ""),
+            "state": str(r.get("state") or "none"),
+            "label": str(r.get("label") or ""),
+            "detail": str(r.get("detail") or ""),
+            "hit": int(r.get("hit") or 0),
+            "total": int(r.get("total") or 0),
+            "stale": bool(r.get("stale")),
+        })
+    return out
 
 
 REGISTRY = [
@@ -305,7 +349,10 @@ def build_cmd(action, targets, dsh_mode="inject", git_bash=False):
             extra += ["--git-bash"]
 
     if action == "status":
-        return base + ["--status", "--target", t]
+        # 走 JSON 那版：界面要的是每行的状态，人看的表格由前端按同一份数据拼。
+        # 跑一遍就够 —— 定位是这份工具里最慢的一段，不能为了两种输出扫两遍盘。
+        # 也不看勾选：这一列要显示的是「本机全部是什么样」，勾选只影响破甲范围。
+        return base + ["--status-json", "--target", "all"]
     if action == "diagnose":
         return base + ["--diagnose", "--target", t]
     if action == "check":
@@ -402,6 +449,11 @@ class Handler(BaseHTTPRequestHandler):
         if self.path.startswith("/api/settings"):
             self._json(json.dumps(read_settings(), ensure_ascii=False).encode("utf-8"))
             return
+        if self.path.startswith("/api/scan"):
+            rows = scan_targets()
+            self._json(json.dumps({"ok": bool(rows), "rows": rows},
+                                  ensure_ascii=False).encode("utf-8"))
+            return
         body = render_page().encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -428,6 +480,8 @@ class Handler(BaseHTTPRequestHandler):
                 spec.append("channel=" + ch)
             if "auto_check" in payload:
                 spec.append("auto=" + ("on" if payload.get("auto_check") else "off"))
+            if "auto_scan" in payload:
+                spec.append("scan=" + ("on" if payload.get("auto_scan") else "off"))
             data = read_settings(" ".join(spec))
             self._json(json.dumps(data, ensure_ascii=False).encode("utf-8"))
             return

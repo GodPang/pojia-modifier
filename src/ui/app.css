@@ -17,6 +17,9 @@
     --danger-soft:#f6e8e4;
     --ok:#2f6b4f;
     --ok-soft:#e6efe8;
+    /* 琥珀只给「改了一半」这一档：绿是完整、灰是没动，中间得有第三色，
+       拿朱红（会改文件）或靛青（强调按钮）来顶都会读错语气。 */
+    --warn:#8a6520;
     --console-bg:#1a1813;
     --console-ink:#e5ddce;
     --console-dim:#7d7566;
@@ -39,6 +42,7 @@
       --danger-soft:#2e211d;
       --ok:#74c39b;
       --ok-soft:#1c2a23;
+      --warn:#d9bb7c;
       --console-bg:#100f0c;
       --console-ink:#ded6c6;
       --console-dim:#6f6859;
@@ -325,11 +329,26 @@
     font-size:10.5px; letter-spacing:.04em; color:var(--accent);
     border:1px solid var(--accent); border-radius:999px; padding:0 6px; flex:none;
   }
+  /* 每行的现状。只上颜色、不加色块：一列二十行全挂背景，软件名就被压下去了。
+     未安装压到 62% 不透明 —— 它在列表里始终是一行，但一眼看得出可以先跳过。 */
+  .row .st{font-size:10.5px; letter-spacing:.03em; flex:none; white-space:nowrap}
+  .row .st:empty{display:none}
+  .row .st[data-state="full"]{color:var(--ok)}
+  .row .st[data-state="partial"]{color:var(--warn)}
+  .row .st[data-state="clean"]{color:var(--ink-3)}
+  .row .st[data-state="none"]{color:var(--ink-3); opacity:.62}
+  /* 跑着的时候列表压暗并且点不动：顶部胶囊在转，但那一小块不够说明
+     「现在整列都在等」。压暗同时挡住来回勾选 —— 中途改选择不会影响已经
+     发出的那一轮，只会让人以为自己的操作没生效。 */
+  body.running .list{opacity:.5; pointer-events:none}
   .foot{
-    display:flex; align-items:center; gap:16px; margin-top:auto;
+    display:flex; align-items:center; gap:11px; margin-top:auto;
     padding:10px 16px; border-top:1px solid var(--line); background:var(--surface-2);
   }
-  .foot .tip{margin-left:auto; font-size:11.5px; color:var(--ink-3)}
+  /* 三个链接 + 一句提示挤在一行，链接不许断字，提示自己折行 */
+  .foot .link{white-space:nowrap; flex:none}
+  .foot .tip{margin-left:auto; font-size:11.5px; line-height:1.4;
+    color:var(--ink-3); text-align:right}
   .link{
     background:none; border:0; padding:0; cursor:pointer; font:inherit;
     font-size:12.5px; color:var(--ink-2); transition:color .12s ease;

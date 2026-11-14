@@ -23,6 +23,7 @@
 
 import base64
 import binascii
+import concurrent.futures
 import datetime
 import hashlib
 import io
@@ -34,6 +35,7 @@ import stat
 import struct
 import subprocess
 import sys
+import threading
 import time
 import traceback
 import unicodedata
@@ -43,8 +45,8 @@ import zlib
 # 0. 常量与运行时开关
 # ---------------------------------------------------------------------------
 
-VERSION = "1.04.2"              # 护照里只存这个，纯数字
-DISPLAY_VERSION = "1.04.2-beta"  # 界面上给人看的：跟 Release tag 一致
+VERSION = "1.04.3"              # 护照里只存这个，纯数字
+DISPLAY_VERSION = "1.04.3-beta"  # 界面上给人看的：跟 Release tag 一致
 APP = "POJIA"                   # 护照里的 tool 字段，磁盘契约，别改
 DISPLAY_NAME = "破甲修改器"      # 只用于对外文案
 
@@ -1897,6 +1899,9 @@ def policy_core(persona_text, short_key):
 # ---------------------------------------------------------------------------
 
 _PROC_CACHE = {"time": 0.0, "rows": []}
+# 状态扫描是并发跑的（二十个目标各要一份进程表）。缓存过期时如果二十个线程
+# 同时重建，就会并发拉起二十次 tasklist / powershell —— 比串行还慢。加锁串行化。
+_PROC_LOCK = threading.Lock()
 _ADMIN_CACHE = {"value": None}
 
 
@@ -1930,15 +1935,20 @@ def process_table(force=False):
     now = time.time()
     if not force and _PROC_CACHE["rows"] and now - _PROC_CACHE["time"] < 45:
         return _PROC_CACHE["rows"]
-    rows = []
-    if IS_WIN:
-        rows = _process_table_win()
-        if not rows:
-            rows = _process_table_win_single()
-    else:
-        rows = _process_table_posix()
-    _PROC_CACHE["rows"] = rows
-    _PROC_CACHE["time"] = now
+    with _PROC_LOCK:
+        # 拿到锁再看一眼：排在前面的线程可能刚重建完，没必要再来一次
+        now = time.time()
+        if not force and _PROC_CACHE["rows"] and now - _PROC_CACHE["time"] < 45:
+            return _PROC_CACHE["rows"]
+        rows = []
+        if IS_WIN:
+            rows = _process_table_win()
+            if not rows:
+                rows = _process_table_win_single()
+        else:
+            rows = _process_table_posix()
+        _PROC_CACHE["rows"] = rows
+        _PROC_CACHE["time"] = now
     return rows
 
 
@@ -2430,9 +2440,23 @@ def _cstr_at(data, off, wide=False):
 def shortcut_target(path):
     """读 .lnk 的目标路径。给绝对路径或空串，从不抛异常。
 
-    结构：76 字节头 -> [LinkTargetIDList] -> [LinkInfo] -> [StringData]
-          -> 若干可选块（含 EnvironmentVariableDataBlock，常写成 %ProgramFiles% 形式）。
-    只认 LinkInfo 的 LocalBasePath(-Unicode) 与环境变量块，其余块一律跳过。
+    解析本身是纯函数，结果按路径缓存：状态扫描那二十个目标都要问一遍同样的
+    几十个 .lnk，不缓存就是二十倍的文件读 + 结构解析。
+    """
+    key = norm(path)
+    if key in _LNK_TARGETS:
+        return _LNK_TARGETS[key]
+    got = _shortcut_target_parse(path)
+    if key:
+        _LNK_TARGETS[key] = got
+    return got
+
+
+def _shortcut_target_parse(path):
+    """真正干活的那个。结构：76 字节头 -> [LinkTargetIDList] -> [LinkInfo]
+    -> [StringData] -> 若干可选块（含 EnvironmentVariableDataBlock，常写成
+    %ProgramFiles% 形式）。只认 LinkInfo 的 LocalBasePath(-Unicode) 与环境变量块，
+    其余块一律跳过。
     """
     data = read_bytes(path)
     if not data or len(data) < 76 or data[:4] != b"L\x00\x00\x00":
@@ -2594,6 +2618,9 @@ def known_folder(name, default=""):
 
 
 _SHORTCUT_CACHE = {"t": 0.0, "files": [], "limit": 0}
+# .lnk -> 目标路径。解析是纯函数，按路径记下就行；不做过期 —— 一次运行内
+# 开始菜单不会变，跨进程本来也不共用。
+_LNK_TARGETS = {}
 
 
 def _shortcut_remember(out, limit):
@@ -2763,7 +2790,11 @@ def _exe_paths_in_text(text, exe_names):
 # 环境变量 POJIA_NO_EVERYTHING 可整体关掉。
 # ---------------------------------------------------------------------------
 
-_EVERYTHING = {"tried": False, "exe": "", "sdk_ready": False, "sdk": None}
+_EVERYTHING = {"tried": False, "exe": "", "sdk_ready": False, "sdk": None,
+               # 卡过一次就在这段时间内不再问它。Everything 的 DLL 装上了、
+               # 主程序却没起时，QueryW 会一直等 IPC —— 一次运行里二十个目标
+               # 各等一遍，几秒就攒成几十秒。
+               "slow_until": 0.0}
 
 
 def everything_dirs():
@@ -2820,15 +2851,25 @@ def everything_exe():
     return found
 
 
-def everything_cli_find(name, limit=200, timeout=8):
-    """es.exe 查一次。没装 / 超时 / 返回码非零都返回 None（表示「这条路不通」）。"""
+def everything_cli_find(name, limit=200, timeout=2.0):
+    """es.exe 查一次。没装 / 超时 / 返回码非零都返回 None（表示「这条路不通」）。
+
+    es.exe 在、Everything 主程序没起时，它会一直等 IPC 直到超时。二十个目标
+    每个试三个文件名，三五秒就攒成半分钟 —— 所以超时一次就记下来，本次运行
+    剩下的目标直接跳过这条路。
+    """
     exe = everything_exe()
     if not exe:
+        return None
+    if time.time() < _EVERYTHING.get("slow_until", 0.0):
         return None
     try:
         done = subprocess.run([exe, "-p", "-n", str(limit), name],
                               stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
                               timeout=timeout)
+    except subprocess.TimeoutExpired:
+        _EVERYTHING["slow_until"] = time.time() + 120
+        return None
     except (OSError, subprocess.SubprocessError):
         return None
     if done.returncode != 0:
@@ -2889,16 +2930,38 @@ def everything_sdk():
     return sdk
 
 
-def everything_sdk_find(name, limit=200):
+def everything_sdk_find(name, limit=200, timeout=2.5):
+    """SDK 查询。ctypes 调用没法从外面打断，所以扔进守护线程 join 一下。
+
+    DLL 在、主程序没起时 QueryW 会死等 IPC：实测一个目标 7 秒，二十个目标
+    串起来能到半分钟。超时就把那个线程丢下（daemon，进程退出时一并结束），
+    并给本次运行打上「别再问了」的标记，后面的目标不再重复等同一份罪。
+    """
     sdk = everything_sdk()
     if not sdk:
+        return None
+    if time.time() < _EVERYTHING.get("slow_until", 0.0):
         return None
     import ctypes
     try:
         sdk.Everything_SetSearchW(name)
         sdk.Everything_SetMax(limit)
         sdk.Everything_SetRequestFlags(0x00000004)
-        if not sdk.Everything_QueryW(True):
+        box = {}
+
+        def run():
+            try:
+                box["ok"] = bool(sdk.Everything_QueryW(True))
+            except Exception:
+                box["ok"] = False
+
+        th = threading.Thread(target=run, daemon=True)
+        th.start()
+        th.join(timeout)
+        if th.is_alive():
+            _EVERYTHING["slow_until"] = time.time() + 120
+            return None
+        if not box.get("ok"):
             return None
         total = sdk.Everything_GetNumResults()
         want = name.lower()
@@ -2916,7 +2979,7 @@ def everything_sdk_find(name, limit=200):
         return None
 
 
-def everything_find(name, limit=200, timeout=8):
+def everything_find(name, limit=200, timeout=3):
     hits = everything_cli_find(name, limit, timeout)
     if hits is not None:
         return hits
@@ -6186,24 +6249,29 @@ def _cmd_paths(cmd):
 
 
 _CMDLINES = {"time": 0.0, "map": {}}
+_CMDLINES_LOCK = threading.Lock()
 
 
 def all_cmdlines():
     now = time.time()
     if _CMDLINES["map"] and now - _CMDLINES["time"] < 45:
         return _CMDLINES["map"]
-    out = {}
-    if IS_WIN:
-        try:
-            out = _win_cmdlines()
-        except Exception:
-            out = {}
-    else:
-        for pid, _n, cmd in process_table():
-            if cmd:
-                out[pid] = cmd
-    _CMDLINES["map"] = out
-    _CMDLINES["time"] = now
+    with _CMDLINES_LOCK:
+        now = time.time()
+        if _CMDLINES["map"] and now - _CMDLINES["time"] < 45:
+            return _CMDLINES["map"]
+        out = {}
+        if IS_WIN:
+            try:
+                out = _win_cmdlines()
+            except Exception:
+                out = {}
+        else:
+            for pid, _n, cmd in process_table():
+                if cmd:
+                    out[pid] = cmd
+        _CMDLINES["map"] = out
+        _CMDLINES["time"] = now
     return out
 
 
@@ -8421,15 +8489,21 @@ def load_settings():
     if ch not in _CHANNEL_RANK:
         ch = default_channel()
     auto = data.get("auto_check")
-    return {"channel": ch, "auto_check": True if auto is None else bool(auto)}
+    # 启动自检默认关：开一次界面就扫二十个软件的安装目录，机械盘上能卡好几秒。
+    # 想要「打开就是最新状态」的人在设置里打开它。
+    scan = data.get("auto_scan")
+    return {"channel": ch, "auto_check": True if auto is None else bool(auto),
+            "auto_scan": False if scan is None else bool(scan)}
 
 
-def save_settings(channel=None, auto_check=None):
+def save_settings(channel=None, auto_check=None, auto_scan=None):
     data = load_settings()
     if channel:
         data["channel"] = channel
     if auto_check is not None:
         data["auto_check"] = bool(auto_check)
+    if auto_scan is not None:
+        data["auto_scan"] = bool(auto_scan)
     save_json(state_path(SETTINGS_FILE), data)
     return data
 
@@ -8762,10 +8836,11 @@ def emit_update_line(ver, ch):
 
 
 def do_settings(spec=""):
-    """看 / 改设置。写成 `channel=beta auto=off` 就顺手存下来。"""
+    """看 / 改设置。写成 `channel=beta auto=off scan=on` 就顺手存下来。"""
     data = load_settings()
     patch_ch = None
     patch_auto = None
+    patch_scan = None
     err = ""
     for piece in re.split(r"[,，\s]+", spec or ""):
         if not piece:
@@ -8787,20 +8862,32 @@ def do_settings(spec=""):
             else:
                 err = "auto 只有 on / off"
                 break
+        elif key in ("scan", "auto-scan", "auto_scan", "自检"):
+            if val in ("on", "1", "true", "yes", "开"):
+                patch_scan = True
+            elif val in ("off", "0", "false", "no", "关"):
+                patch_scan = False
+            else:
+                err = "scan 只有 on / off"
+                break
         else:
             err = "不认识的设置项：%s" % key
             break
     if err:
         fail_msg(err)
         return 2
-    if patch_ch or patch_auto is not None:
-        data = save_settings(channel=patch_ch, auto_check=patch_auto)
-        say("  已保存：收%s，启动检查%s"
-            % (channel_label(data["channel"]), "开" if data["auto_check"] else "关"))
+    if patch_ch or patch_auto is not None or patch_scan is not None:
+        data = save_settings(channel=patch_ch, auto_check=patch_auto,
+                             auto_scan=patch_scan)
+        say("  已保存：收%s，启动检查%s，启动自检%s"
+            % (channel_label(data["channel"]),
+               "开" if data["auto_check"] else "关",
+               "开" if data["auto_scan"] else "关"))
     payload = {
         "version": DISPLAY_VERSION,
         "channel": data["channel"],
         "auto_check": data["auto_check"],
+        "auto_scan": data["auto_scan"],
         "channels": [{"id": k, "name": _CHANNEL_NAME[k] + "通道"}
                      for k in ("alpha", "beta", "mod")],
     }
@@ -9225,6 +9312,98 @@ def do_status(ctx, targets):
     return 0
 
 
+# --------------------------------------------------------------- 界面用的状态
+# 四档，给图形界面逐行上色。比 --status 的「严格态 / 宽松态·过期」好处在于
+# 一眼能读懂，而且能表达「一半文件被换回去了」这种真实存在的中间态。
+_STATE_LABEL = {"none": "未安装", "clean": "未破甲",
+                "partial": "部分破甲", "full": "已破甲"}
+
+
+def scan_target(tgt, ctx):
+    """一个目标的现状。判据是护照里的文件戳记，不是 markers，也不是主文件哈希。
+
+    客户端更新会把注入过的文件整树换回出厂版本（戳记全不符、主文件可能连标记
+    都没了）。这种情况该说「未破甲」，而不是「已安装」或者一句读不懂的「严格态」。
+    反过来，只活下来一部分文件就是「部分破甲」—— 这是最需要被看见的一档。
+    """
+    row = {"key": tgt.key, "name": tgt.name,
+           "state": "none", "label": _STATE_LABEL["none"],
+           "detail": "", "root": "", "src": "",
+           "hit": 0, "total": 0, "stale": False}
+    try:
+        root, src, _tried = tgt.resolve(EXPLICIT.get(tgt.key, ""))
+    except (OSError, ValueError):
+        root, src = "", ""
+    if not root:
+        row["detail"] = "没有找到安装目录"
+        return row
+    row["root"], row["src"] = root, src
+    pp = passport_load(root) or {}
+    stamps = pp.get("file_stamps") or {}
+    hit = total = 0
+    for path, want in stamps.items():
+        total += 1
+        if want and file_stamp(path) == want:
+            hit += 1
+    row["hit"], row["total"] = hit, total
+    if total:
+        state = "full" if hit == total else ("partial" if hit else "clean")
+        row["detail"] = "%d/%d 个文件还是注入时的样子" % (hit, total)
+    else:
+        # 没护照：退回主文件里有没有本工具的标记。有标记说明是别的版本写的，
+        # 算已破甲但标一句过期，别把它说成完全没动过。
+        try:
+            label, detail = tgt.status(root, ctx)
+        except (OSError, ValueError):
+            label, detail = "读不到", ""
+        row["detail"] = detail
+        if label.startswith("宽松态"):
+            state = "full"
+            row["stale"] = (label != "宽松态·当前")
+            row["detail"] = "文件里有本工具的标记，但没有护照记录"
+        else:
+            state = "clean"
+    pv = str(pp.get("version") or "")
+    if state == "full":
+        if row["stale"] or (pv and version_tuple(pv) != version_tuple(VERSION)):
+            row["stale"] = True
+            row["detail"] = ("上一版（%s）写的，重跑一次会更新" % pv) if pv else row["detail"]
+    row["state"], row["label"] = state, _STATE_LABEL[state]
+    return row
+
+
+def do_status_json(ctx, targets):
+    """给图形界面读的一行 JSON。人看的字随便改，这行保持不动。
+
+    二十个目标里有七八个是「没装」的，每个都要把兜底链走到底（盘符全扫），
+    串行实测 40 秒 —— 等不起就没人点第二次。定位本身是 IO 等待，线程池并发
+    扫即可；顺序按 targets 原样保留，界面按 key 对，不依赖行序。
+    """
+    each = list(targets)
+    rows = [None] * len(each)
+
+    def work(i, t):
+        try:
+            rows[i] = scan_target(t, ctx)
+        except (OSError, ValueError, KeyError) as exc:
+            rows[i] = {"key": t.key, "name": t.name, "state": "none",
+                       "label": _STATE_LABEL["none"],
+                       "detail": "扫描出错：%s" % exc, "root": "", "src": "",
+                       "hit": 0, "total": 0, "stale": False}
+
+    try:
+        with concurrent.futures.ThreadPoolExecutor(
+                max_workers=min(8, len(each) or 1)) as pool:
+            for fut in [pool.submit(work, i, t) for i, t in enumerate(each)]:
+                fut.result()
+    except (RuntimeError, OSError):
+        # 线程池起不来（极少见）就老实串行
+        for i, t in enumerate(each):
+            work(i, t)
+    _emit("#status " + json.dumps(rows, ensure_ascii=False))
+    return 0
+
+
 def do_purge(ctx, targets):
     code = do_revert(ctx, targets)
     if OPT["dry"]:
@@ -9499,6 +9678,8 @@ def build_parser():
     a("--restore", action="store_true", help="从备份还原（不删本工具目录）")
     a("--check", action="store_true", help="只读体检")
     a("--status", action="store_true", help="只读状态")
+    a("--status-json", dest="status_json", action="store_true",
+      help="只读状态，末行吐 #status <JSON>（给界面读）")
     a("--snapshot", action="store_true", help="生成当前状态快照")
     a("--compare", action="store_true", help="与上次快照对比")
     a("--update", action="store_true", help="检查并更新自身")
@@ -9717,6 +9898,8 @@ def main(argv=None):
 
     if o.check:
         return do_check(ctx, targets)
+    if o.status_json:
+        return do_status_json(ctx, targets)
     if o.status or o.diagnose:
         return do_status(ctx, targets)
     if o.snapshot:

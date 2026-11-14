@@ -16,6 +16,7 @@ const uBar = $("u-bar"), uText = $("u-text"), uGo = $("u-go"), uNo = $("u-no");
 const resultEl = $("result"), rTitle = $("r-title"), rText = $("r-text"), rLog = $("r-log");
 const uCheck = $("u-check"), uState = $("u-state"), uInstall = $("u-install");
 const uProg = $("u-prog"), uFill = $("u-fill"), uPct = $("u-pct"), uLog = $("u-log");
+const rScan = $("rescan"), scanTip = $("scan-tip");
 
 /* 软件清单 */
 TARGETS.forEach(([key, label]) => {
@@ -25,7 +26,8 @@ TARGETS.forEach(([key, label]) => {
   b.dataset.key = key;
   b.setAttribute("aria-pressed", "true");
   b.innerHTML = `<span class="box"></span><span class="lbl">${label}</span>`
-    + (key === "dsh" ? `<span class="badge">有选项</span>` : "");
+    + (key === "dsh" ? `<span class="badge">有选项</span>` : "")
+    + `<span class="st" data-st="${key}"></span>`;
   b.onclick = () => {
     if (selected.has(key)) selected.delete(key); else selected.add(key);
     b.setAttribute("aria-pressed", selected.has(key));
@@ -76,6 +78,89 @@ $("none").onclick = () => {
   [...chipsEl.children].forEach(c => c.setAttribute("aria-pressed", "false"));
   sync();
 };
+
+/* ── 每行的现状 ──────────────────────────────────────────────
+   四档：已破甲 / 部分破甲 / 未破甲 / 未安装。
+   以前点「先检测一下」会把人拽到运行记录页去数行；现在跑完就地把每行标出来，
+   日志留在那边给想深看的人。判据来自核心的护照戳记 —— 客户端升级把注入过的
+   文件换回出厂版时，行上会从「已破甲」掉成「部分破甲」或「未破甲」。 */
+let scanMap = {};
+let scanning = false;
+
+const ST_TEXT = {full: "已破甲", partial: "部分破甲", clean: "未破甲", none: "未安装"};
+
+function paintScan(rows){
+  const map = {};
+  (rows || []).forEach(r => { if (r && r.key) map[r.key] = r; });
+  scanMap = map;
+  [...chipsEl.children].forEach(row => {
+    const key = row.dataset.key;
+    const el = row.querySelector(".st");
+    if (!el) return;
+    const r = map[key];
+    if (!r){
+      el.textContent = "";
+      delete el.dataset.state;
+      el.removeAttribute("title");
+      return;
+    }
+    /* stale 只跟「已破甲」搭配：上一版写的，文件还是那批，只是版本旧了 */
+    el.textContent = (ST_TEXT[r.state] || r.label || "")
+      + (r.stale && r.state === "full" ? "·旧版" : "");
+    el.dataset.state = r.state;
+    el.title = r.detail || "";
+  });
+  lastScan = Date.now();
+  paintScanTip();
+}
+
+function paintScanTip(){
+  const rows = Object.keys(scanMap).map(k => scanMap[k]);
+  if (!rows.length){ scanTip.textContent = "没装的会跳过"; return; }
+  const n = k => rows.filter(r => r.state === k).length;
+  const full = n("full"), part = n("partial"), clean = n("clean");
+  /* 这一格只有百来像素宽，句子长了就被折成两行把整条挤高 */
+  scanTip.textContent = part ? `${part} 个只改了一半`
+    : (full && !clean ? `${full} 个都已破甲` : `${clean} 个还没动`);
+}
+
+/* 扫一遍全机。慢是真的慢（二十个目标各自要定位安装目录），所以只在
+   点检测、跑完破甲/还原、以及设置里开了启动自检时才调。
+   八秒内刚扫过就直接复用 —— 检测的输出流里已经带了一份，没必要再排一次盘。 */
+let lastScan = 0;
+
+async function refreshScan(){
+  if (scanning) return;
+  if (Date.now() - lastScan < 8000) return;
+  scanning = true;
+  rScan.disabled = true;
+  scanTip.textContent = "正在扫…";
+  try{
+    const r = await fetch(`/api/scan?t=${TOKEN}`);
+    const d = await r.json();
+    if (d && d.ok && d.rows.length) paintScan(d.rows);
+    else scanTip.textContent = "没扫出来";
+  }catch(e){
+    scanTip.textContent = "没扫出来：连不上";
+  }finally{
+    scanning = false;
+    rScan.disabled = false;
+  }
+}
+rScan.onclick = () => { if (!busy && !scanning) refreshScan(); };
+
+/* 状态的一句话汇总，用在结论条上 */
+function scanSummary(){
+  const rows = Object.keys(scanMap).map(k => scanMap[k]);
+  if (!rows.length) return "";
+  const c = k => rows.filter(r => r.state === k).length;
+  const parts = [];
+  if (c("full")) parts.push(`${c("full")} 个已破甲`);
+  if (c("partial")) parts.push(`${c("partial")} 个部分破甲`);
+  if (c("clean")) parts.push(`${c("clean")} 个未破甲`);
+  if (c("none")) parts.push(`${c("none")} 个没装`);
+  return parts.join("，");
+}
 
 /* DSH 选项 */
 function paintMode(){
@@ -205,6 +290,8 @@ function actionName(key){
    只读动作的 1 不是失败 —— 体检本来就会「查出 5 项需要处理」，那是它干完活了，
    写成一抹朱红的「失败」只会把人吓一跳。 */
 const READ_ACTIONS = {status: 1, diagnose: 1, check: 1, dryrun: 1, snapshot: 1, compare: 1};
+/* 跑完要重扫行上状态的动作。预演、诊断、快照都不动文件，没必要再扫一遍。 */
+const SCAN_AFTER = {status: 1, apply: 1, revert: 1};
 
 function showResult(action, code, plain, secs){
   const name = actionName(action);
@@ -224,6 +311,10 @@ function showResult(action, code, plain, secs){
   } else if (state === "warn"){
     rTitle.textContent = "完成";
     rText.textContent = `${name}跑完了，有需要处理的地方。细节在运行记录里。`;
+  } else if (action === "status"){
+    /* 检测的结论不在日志里，在左边那列的字上；这里只报总数 */
+    rTitle.textContent = "检测完毕";
+    rText.textContent = (scanSummary() || "扫完了") + "。每行对着看，细节在运行记录。";
   } else {
     rTitle.textContent = "成功";
     rText.textContent = `${name}完成，用时 ${secs.toFixed(1)}s。每一步都记在运行记录里。`;
@@ -249,10 +340,12 @@ async function run(action){
     startUpdateUI();
     showPage("settings");
   } else {
+    /* 点了就跑，输出记进「运行记录」，但**不切页** —— 结论写在左列每行的
+       状态上，把人拽去读几十行日志纯属多余。想看细节的点左边「运行记录」。 */
     consoleEl.classList.add("on");
-    showPage("log");             /* 点了就跑，输出在记录页 —— 顺手切过去 */
   }
   goBtn.disabled = true;
+  document.body.classList.add("running");
   document.querySelectorAll(".act").forEach(b => b.disabled = true);
   if (!started){ outEl.innerHTML = ""; started = true; }
   const t0 = Date.now();
@@ -268,11 +361,24 @@ async function run(action){
     }
     return false;
   };
-  /* 一行一处分流：进度行喂进度条，别的行进日志（升级进设置页那块小窗）。 */
+  /* 一行一处分流：进度行喂进度条，#status 刷每行状态，别的行进日志。 */
   const emitLine = p => {
     if (p.indexOf("#progress ") === 0){
       const a = p.split(" ");
       setProgress(parseInt(a[1], 10), a[2], a[3]);
+      return;
+    }
+    if (p.indexOf("#status ") === 0){
+      let rows = null;
+      try{ rows = JSON.parse(p.slice(8)); }catch(e){}
+      if (Array.isArray(rows)){
+        paintScan(rows);
+        /* 日志页也要有东西看：拿同一份数据拼成人读的表格，不排第二次盘 */
+        rows.forEach(r => outEl.insertAdjacentHTML("beforeend", ansiToHtml(
+          "  " + String(r.key || "").padEnd(11) + " "
+          + String(r.name || "").padEnd(22) + " " + (r.label || "")
+          + (r.detail ? "  " + r.detail : "")) + "\n"));
+      }
       return;
     }
     plain += p + "\n";
@@ -314,6 +420,7 @@ async function run(action){
   }finally{
     clearInterval(timer);
     busy = false;
+    document.body.classList.remove("running");
     consoleEl.classList.remove("on");
     outEl.scrollTop = outEl.scrollHeight;
     /* 有退出码就以退出码为准：只读动作打出 [!] 提示是正常的，
@@ -341,10 +448,10 @@ async function run(action){
         uCheck.disabled = false;
       }
     } else {
-      /* 输出在「运行记录」页，跑完得把人送回来，并且在这一页写清成没成。
-         不送回来，用户看到的就永远是最后那一页日志，主界面上什么都没有。 */
+      /* 破甲 / 还原 / 检测跑完：先就地重扫一遍每行的状态，再写结论 ——
+         顺序反了，结论条拿到的就是上一轮的数字。 */
+      if (SCAN_AFTER[action]) await refreshScan();
       showResult(action, code, plain, (Date.now() - t0) / 1000);
-      showPage("main");
     }
   }
 }
@@ -405,7 +512,8 @@ const CHAN_DESC = {
 const CHAN_TAG = {alpha: "最早", beta: "常用", mod: "最稳"};
 
 const setChan = $("set-chan"), setAuto = $("set-auto"), setMsg = $("set-msg");
-let setCfg = {channel: "", auto_check: true, channels: []};
+const setScan = $("set-scan");
+let setCfg = {channel: "", auto_check: true, auto_scan: false, channels: []};
 
 function drawChannels(){
   setChan.innerHTML = "";
@@ -445,6 +553,7 @@ async function saveSettings(patch){
     const d = await r.json();
     if (d && d.channel) setCfg = Object.assign({}, setCfg, d);
     setAuto.checked = !!setCfg.auto_check;
+    setScan.checked = !!setCfg.auto_scan;
     flashSaved();
     probeUpdate();                 /* 通道换了，提示跟着重算 */
   }catch(e){}
@@ -458,9 +567,11 @@ async function loadSettings(){
   }catch(e){}
   drawChannels();
   setAuto.checked = !!setCfg.auto_check;
+  setScan.checked = !!setCfg.auto_scan;
 }
 
 setAuto.onchange = () => saveSettings({auto_check: setAuto.checked});
+setScan.onchange = () => saveSettings({auto_scan: setScan.checked});
 
 /* ── 更新提示 ────────────────────────────────────────────────
    进页面问一次「有没有新版」：只读 GitHub 的发布信息，不带任何本机内容。
@@ -572,7 +683,8 @@ function showUpgrading(){
 }
 
 /* 先问设置：关掉「启动时检查更新」就一次网络请求都不发。
-   拿到之后再决定要不要查 —— 顺序反了就等于没关。 */
+   拿到之后再决定要不要查 —— 顺序反了就等于没关。
+   自检同理：默认关，扫盘要几秒，不能每次开界面都白等。 */
 (async function boot(){
   try{
     const r = await fetch(`/api/settings?t=${TOKEN}`);
@@ -580,5 +692,7 @@ function showUpgrading(){
     if (d && d.channel) { setCfg = d; }
   }catch(e){}
   setAuto.checked = !!setCfg.auto_check;
+  setScan.checked = !!setCfg.auto_scan;
+  if (setCfg.auto_scan) refreshScan();
   if (setCfg.auto_check !== false) probeUpdate();
 })();
