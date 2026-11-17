@@ -45,7 +45,7 @@
 
 | 层 | 内容 | 落在哪些目标 |
 |---|---|---|
-| 客户端注记 | 「你在 X 环境里运行」+ 该宿主特有的机制坑 | 20 个目标各一条 |
+| 客户端注记 | 「你在 X 环境里运行」+ 该宿主特有的机制坑 | 21 个目标各一条 |
 | `_coding` | 工具型执行纪律（先动手、拒绝不是半个完成态、夹具字段、形态一次选定、类型化槽位、交付后重开、进度行） | codex / claude / kiro / zcode / antigravity / reasonix / traecn / qodercn |
 | 模型专用 | 该模型特有的坏法：`_claude`、`_kiro`、`_glm`、`_gemini`、`_reasonix`、`_traecn`、`_qodercn` | 同名目标，可叠多层 |
 

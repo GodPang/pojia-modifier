@@ -64,7 +64,7 @@
 
 ## 3. 目标清单
 
-以下为必须支持的 20 个目标。路径中的 `~` 表示用户主目录。
+以下为必须支持的 21 个目标。路径中的 `~` 表示用户主目录。
 
 > **路径的唯一权威是 `20-locate` 第 2 节的固定路径表。** 本节只列"形态"与"注意事项"，
 > 目录名与文件名的细节不在这里重复——两处都写必然漂移。
@@ -72,6 +72,7 @@
 | 短标识 | 显示名 | 主目录 | 指令文件 | 形态 |
 |---|---|---|---|---|
 | `dsh` | DSH (DeepSeek Harness) | 由安装根推出（见 4） | 由安装根推出 | 整段替换 + asar 解包 |
+| `teleagent` | TeleAgent | `<设备根>/users/<ownerDir>` | `memory/USER.md` | 标记块（账号记忆注入 system prompt） |
 | `wb` | WorkBuddy | 由安装根推出 | 多份模板 | 整段替换 + 云记忆 |
 | `wbintl` | WorkBuddy Intl | 同上，国际版 | 同上 | 整段替换 + 云记忆 |
 | `zcode` | ZCode | `~/.zcode` | `zcode.cjs` 内的字段 | 字段注入 + 系统提示词替换 |
@@ -96,6 +97,7 @@
 
 | 目标 | 环境变量 | 进程名 | 注意 |
 |---|---|---|---|
+| `teleagent` | `TELEAGENT_DATA_DIR` | `TeleAgent.exe` / `TeleAgent` | 落点在账号根不在安装根；ownerDir 由 `current-owner.json` 决定，多账号只对当前账号写；进程只用于提示重启 |
 | `codex` | `CODEX_HOME` | `codex` / `codex-code-mode-host` | 安装根与配置根是同一个 |
 | `cursor` | `CURSOR_HOME` | `Cursor` | 规则文件在 `rules/` 子目录；另有旧的 `.cursorrules` 需同步 |
 | `claude` | `CLAUDE_CONFIG_DIR` | `claude` / `Claude` | 桌面版与 CLI 同名进程 |
@@ -243,7 +245,7 @@ ZCode 的系统提示词嵌在 `zcode.cjs` 里，是一个 JS 字符串常量。
 
 ## 8. 验收要点
 
-- 20 个目标逐个跑"注入 → 再注入 → 撤回"，字节级一致。
+- 21 个目标逐个跑"注入 → 再注入 → 撤回"，字节级一致。
 - 目标目录不存在时，注入能自建，撤回能删干净（不留空目录）。
 - DSH 解包后，注入点文件存在且被正确改写；还原后解包目录被清除。
 - DSH 会话守卫：`--apply` 后每个 profile 的 `node_modules/pojia-session-guard/` 齐两个

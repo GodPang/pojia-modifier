@@ -25,30 +25,31 @@
 
 ## 2. 固定路径总表
 
-20 个目标，顺序即执行顺序。`配置目录` 是主落点所在；`环境变量` 是覆盖项，优先级高于默认路径。
+21 个目标，顺序即执行顺序。`配置目录` 是主落点所在；`环境变量` 是覆盖项，优先级高于默认路径。
 
 | # | key | 显示名 | 配置目录（默认） | 环境变量覆盖 |
 |---|---|---|---|---|
 | 1 | `dsh` | DSH (DeepSeek Harness) | `~\.dsh` | `DSH_HOME` |
-| 2 | `wb` | WorkBuddy | 数据 `~\.workbuddy`／安装 `%LOCALAPPDATA%\Programs\WorkBuddy` | — |
-| 3 | `wbintl` | WorkBuddy Intl | 数据 `~\.workbuddy-ai`／安装 `%LOCALAPPDATA%\Programs\WorkBuddyAI` | — |
-| 4 | `zcode` | ZCode | `~\.zcode` | `ZCODE_HOME`、`ZCODE_CONFIG_DIR` |
-| 5 | `codex` | Codex | `~\.codex` | `CODEX_HOME` |
-| 6 | `cursor` | Cursor | `~\.cursor` | `CURSOR_HOME` |
-| 7 | `claude` | Claude | `~\.claude` | `CLAUDE_CONFIG_DIR` |
-| 8 | `antigravity` | Antigravity | `~\.gemini` | `GEMINI_CLI_HOME` |
-| 9 | `qwen` | Qwen Code | `~\.qwen` | `QWEN_CONFIG_DIR` |
-| 10 | `iflow` | iFlow CLI | `~\.iflow` | `IFLOW_CONFIG_DIR` |
-| 11 | `trae` | Trae | `~\.trae`（国际）/ `~\.trae-cn`（国内） | `TRAE_HOME`、`TRAE_CN_HOME` |
-| 12 | `codebuddy` | CodeBuddy | `~\.codebuddy` | — |
-| 13 | `opencode` | OpenCode | `~\.config\opencode` | `OPENCODE_CONFIG`、`XDG_CONFIG_HOME` |
-| 14 | `windsurf` | Windsurf | `~\.codeium\windsurf` | `WINDSURF_HOME`、`CODEIUM_HOME` |
-| 15 | `cline` | Cline | `~\Documents\Cline\Rules` | `CLINE_CONFIG_DIR` |
-| 16 | `copilot` | Copilot CLI | `~\.copilot` | `COPILOT_HOME` |
-| 17 | `kiro` | Kiro | `~\.kiro` | `KIRO_HOME` |
-| 18 | `reasonix` | Reasonix | `%APPDATA%\reasonix`（macOS / Linux 为 `~\.reasonix`） | `REASONIX_HOME` / `REASONIX_STATE_HOME` |
-| 19 | `traecn` | Trae CN | `~\.trae-cn` | `TRAE_CN_HOME` |
-| 20 | `qodercn` | Qoder CN | `~\.qoder-cn` | `QODER_CONFIG_DIR` / `QODER_HOME` |
+| 2 | `teleagent` | TeleAgent | 账号根 `~\.local\share\TeleAgent\users\<ownerDir>`（设备根 `~\.local\share\TeleAgent`） | `TELEAGENT_DATA_DIR` |
+| 3 | `wb` | WorkBuddy | 数据 `~\.workbuddy`／安装 `%LOCALAPPDATA%\Programs\WorkBuddy` | — |
+| 4 | `wbintl` | WorkBuddy Intl | 数据 `~\.workbuddy-ai`／安装 `%LOCALAPPDATA%\Programs\WorkBuddyAI` | — |
+| 5 | `zcode` | ZCode | `~\.zcode` | `ZCODE_HOME`、`ZCODE_CONFIG_DIR` |
+| 6 | `codex` | Codex | `~\.codex` | `CODEX_HOME` |
+| 7 | `cursor` | Cursor | `~\.cursor` | `CURSOR_HOME` |
+| 8 | `claude` | Claude | `~\.claude` | `CLAUDE_CONFIG_DIR` |
+| 9 | `antigravity` | Antigravity | `~\.gemini` | `GEMINI_CLI_HOME` |
+| 10 | `qwen` | Qwen Code | `~\.qwen` | `QWEN_CONFIG_DIR` |
+| 11 | `iflow` | iFlow CLI | `~\.iflow` | `IFLOW_CONFIG_DIR` |
+| 12 | `trae` | Trae | `~\.trae`（国际）/ `~\.trae-cn`（国内） | `TRAE_HOME`、`TRAE_CN_HOME` |
+| 13 | `codebuddy` | CodeBuddy | `~\.codebuddy` | — |
+| 14 | `opencode` | OpenCode | `~\.config\opencode` | `OPENCODE_CONFIG`、`XDG_CONFIG_HOME` |
+| 15 | `windsurf` | Windsurf | `~\.codeium\windsurf` | `WINDSURF_HOME`、`CODEIUM_HOME` |
+| 16 | `cline` | Cline | `~\Documents\Cline\Rules` | `CLINE_CONFIG_DIR` |
+| 17 | `copilot` | Copilot CLI | `~\.copilot` | `COPILOT_HOME` |
+| 18 | `kiro` | Kiro | `~\.kiro` | `KIRO_HOME` |
+| 19 | `reasonix` | Reasonix | `%APPDATA%\reasonix`（macOS / Linux 为 `~\.reasonix`） | `REASONIX_HOME` / `REASONIX_STATE_HOME` |
+| 20 | `traecn` | Trae CN | `~\.trae-cn` | `TRAE_CN_HOME` |
+| 21 | `qodercn` | Qoder CN | `~\.qoder-cn` | `QODER_CONFIG_DIR` / `QODER_HOME` |
 
 ### 2.1 每个目标的"标志物"
 
@@ -67,6 +68,7 @@ macOS 上尤其明显：`~/.claude` 里常年只有 `projects/`、`settings.json
 
 | key | 标志物（相对配置目录） |
 |---|---|
+| `teleagent` | 账号根里有目录 `memory\` 或文件 `USER.md`（按 `current-owner.json` 的 ownerDir 定位账号根） |
 | `codex` | 文件 `config.toml` 或 `AGENTS.md`；目录 `skills\` |
 | `cursor` | 文件 `.cursorrules`；目录 `rules\` |
 | `claude` | 文件 `CLAUDE.md`；目录 `skills\` |
@@ -157,6 +159,31 @@ macOS 的 `.app` 包内资源在 `Contents/Resources/` 下，标志物是
 `Contents/Resources/app.asar`（或该目录下的 `app/`），比 Windows 多一层。
 `~/.dsh` 里没有 `profiles/*/cordis.patch.yml` 的空壳不算数。
 
+### 2.4 TeleAgent 的设备根 / 账号根
+
+TeleAgent 是"设备根 + 账号根"双根结构，且**落点在账号根**，不在安装目录（`TeleAgent.exe`
+所在的盘符目录只读、不写）：
+
+```
+设备根：  ~\.local\share\TeleAgent                     ← 可由 TELEAGENT_DATA_DIR 覆盖
+账号根：  <设备根>\users\<ownerDir>                     ← ownerDir 从 current-owner.json 读
+落点：    <账号根>\memory\USER.md                       ← 宿主把它注入 system prompt
+```
+
+`ownerDir` 是运行期按登录账号生成的（如 `v1_public_<userId>`），写死不得。定位顺序：
+`--teleagent-dir` → 手动 → 上次发现 → `current-owner.json` 的 ownerDir →
+扫描 `<设备根>\users\*\memory` 唯一目录。多账号时只对 `current-owner.json` 指向的当前
+账号动手，不跨账号写。
+
+宿主把 `memory/PATHS.md`、`MEMORY.md`、`USER.md`、`LATEST_DAILY_MEMORY.md` 四个文件列进
+agent 配置的 `instructions` 数组，每次会话整份注入 system prompt。选 `USER.md` 是因为它
+本就是"用户长期记忆"、已有内容，用标记块共存即可；四个文件里挑任何一个都能进系统
+提示词，但 `USER.md` 语义最贴合，且不用新建文件。
+
+asar 兼容性：TeleAgent 3.x 的 `app.asar` 用了新的 16 字节头（四个 u32，JSON 从偏移 16
+起），旧的 8 字节头解析器读它会在偏移上错位。破甲工具不碰 asar，但读取层要能正确识别
+这种头，避免解包/取证时误判。
+
 ---
 
 ## 3. 逐目标写入落点
@@ -167,6 +194,7 @@ macOS 的 `.app` 包内资源在 `Contents/Resources/` 下，标志物是
 
 | key | 主落点 | 附加入口 |
 |---|---|---|
+| `teleagent` | `memory\USER.md`（账号根下；宿主注入 system prompt） | — |
 | `codex` | `config.toml`（TOML 顶层键 `model_instructions_file` 指向 `managed-prompts\pojia-persona.md`） | `AGENTS.md` |
 | `cursor` | `rules\pojia-inject.mdc` | — |
 | `claude` | `CLAUDE.md` | `output-styles\pojia.md`、`settings.json`、状态文件 `pojia-output-style.json` |
@@ -433,7 +461,7 @@ wb-switch / cc-switch 这类多版本切换器必须记住每个版本的绝对�
 
 ## 10. 验收要点
 
-- 固定表里 20 个路径全部能在没有真实安装的机器上被"枚举"出来（不需要全部命中）。
+- 固定表里 21 个路径全部能在没有真实安装的机器上被"枚举"出来（不需要全部命中）。
 - 显式指定一个不存在的路径 → 有提示，且不会误用其他目录。
 - 手动目录存在时不再触发全盘扫描（可用耗时断言）。
 - 进程表读不到（无权限）时，兜底链其余步骤照常工作。

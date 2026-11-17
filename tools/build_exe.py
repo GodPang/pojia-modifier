@@ -226,6 +226,8 @@ def compile_core(workdir, mod="pojia_core"):
 def main():
     ap = argparse.ArgumentParser(description="打单文件可执行文件")
     ap.add_argument("--name", default="pojia-modifier", help="产物名（不含扩展名）")
+    ap.add_argument("--icon", default=None, metavar="ICO",
+                    help="exe 图标 .ico；不传时用 assets/pojia-modifier.ico（存在则自动带）")
     ap.add_argument("--dist", default=os.path.join("build", "dist"))
     ap.add_argument("--work", default=os.path.join("build", "work"))
     ap.add_argument("--spec", default="build")
@@ -322,6 +324,14 @@ def main():
     elif rt:
         log("解包目录：%s" % rt)
         cmd += ["--runtime-tmpdir", rt]
+    # exe 图标：显式 --icon 优先，否则自动用仓库自带的图标。
+    icon = args.icon or os.path.join(ROOT, "assets", "pojia-modifier.ico")
+    if os.path.isfile(icon):
+        cmd += ["--icon", icon]
+        log("exe 图标：%s" % icon)
+    else:
+        log("未找到图标 %s，用 PyInstaller 默认图标" % icon)
+
     cmd.append(entry)
 
     log("PyInstaller（%s）" % ("Cython 编译版" if use_cython else "纯源码"))

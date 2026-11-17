@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """逐目标往返自检（不属于交付物，只用来证明行为等价）。
 
-对 20 个目标各造一个假安装，跑：
+对 21 个目标各造一个假安装，跑：
     注入 -> 再注入（必须字节不变）-> 撤回（必须字节回到原样）
 
 只比字节，不看内部结构。
@@ -23,7 +23,8 @@ PASS = []
 FAIL = []
 
 
-def tree(top, skip_suffix=(".pojia.bak", ".dshpurge.bak", ".unlockbak", ".unlockbak-ai")):
+def tree(top, skip_suffix=(".pojia.bak", ".dshpurge.bak", ".unlockbak", ".unlockbak-ai",
+                           ".teleagent.bak")):
     out = {}
     for base, dirs, files in os.walk(top):
         dirs[:] = [d for d in dirs if d not in ("__pycache__", ".pojia")]
@@ -108,6 +109,12 @@ def seed(root):
     write(os.path.join(d, "resources", "app", "node_modules", "@deepseek-ai",
                        "dsh-web-app", "presets", "base.patch.yml"), "name: base\n")
     cases.append(("dsh", ["--dsh-dir", d], d))
+
+    # 1b teleagent（账号根，落点 memory/USER.md）
+    ta = os.path.join(root, "TeleAgent", "users", "v1_public_test")
+    write(os.path.join(ta, "memory", "USER.md"),
+          "---\r\nAIGC:\r\n  Label: '1'\r\n---\r\n\r\n# 用户长期记忆\r\n\r\n- 一条已有记忆\r\n")
+    cases.append(("teleagent", ["--teleagent-dir", ta], ta))
 
     # 2 wb
     w = os.path.join(root, "wb")

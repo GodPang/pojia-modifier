@@ -50,7 +50,7 @@ else:
     CORE = os.path.join(HERE, "pojia.py")
 IS_WIN = (os.name == "nt")
 TOKEN = secrets.token_urlsafe(18)
-REPO_NAME = "Mladery/pojia-modifier"
+REPO_NAME = "GodPang/pojia-modifier"
 REPO_URL = "https://github.com/" + REPO_NAME
 _VER_CACHE = []
 
@@ -295,6 +295,7 @@ def scan_targets(timeout=90):
 
 REGISTRY = [
     ("dsh", "DeepSeek Harness"),
+    ("teleagent", "TeleAgent"),
     ("wb", "WorkBuddy"),
     ("wbintl", "WorkBuddy 国际版"),
     ("zcode", "ZCode"),
@@ -378,6 +379,7 @@ _SHELL = """<!DOCTYPE html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='13' fill='%232b3f6b'/%3E%3Cpath d='M32 9 51 16v16c0 13-9 20-19 24C22 52 13 45 13 32V16z' fill='%23fdfcf8'/%3E%3Cpath d='M41 12 21 53' stroke='%231d2c4d' stroke-width='5'/%3E%3C/svg%3E">
 <title>破甲修改器</title>
 <style>
 __CSS__

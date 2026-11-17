@@ -1,20 +1,22 @@
 # 破甲修改器
 
-> 产物名 `pojia-modifier`，对外版本号 **`v1.04.3-beta`**，MIT 正文 + Commons Clause。
+<img src="assets/icon-preview.png" alt="破甲修改器图标" width="88" align="right">
+
+> 产物名 `pojia-modifier`，对外版本号 **`v1.05.0-beta`**，MIT 正文 + Commons Clause。
 > 后缀即渠道：`-alpha` 开发版、`-beta` 测试版、`-mod` 稳定版。
 > 仅限在**自己有权管理的本机设备**上使用，下载前请读 [完整免责声明](docs/disclaimer.md)。
 
-[![CI](https://github.com/Mladery/pojia-modifier/actions/workflows/ci.yml/badge.svg)](https://github.com/Mladery/pojia-modifier/actions/workflows/ci.yml)
-[![Build](https://github.com/Mladery/pojia-modifier/actions/workflows/build.yml/badge.svg)](https://github.com/Mladery/pojia-modifier/actions/workflows/build.yml)
+[![CI](https://github.com/GodPang/pojia-modifier/actions/workflows/ci.yml/badge.svg)](https://github.com/GodPang/pojia-modifier/actions/workflows/ci.yml)
+[![Build](https://github.com/GodPang/pojia-modifier/actions/workflows/build.yml/badge.svg)](https://github.com/GodPang/pojia-modifier/actions/workflows/build.yml)
 [![License](https://img.shields.io/badge/license-MIT%20%2B%20Commons%20Clause-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/downloads/)
 
-**一句话：把你电脑上 20 个 AI 客户端「自己改不到的内置提示词」，换成你自己写的那份。**
+**一句话：把你电脑上 21 个 AI 客户端「自己改不到的内置提示词」，换成你自己写的那份。**
 
 | 换完之后 | 说明 |
 |---|---|
 | 用**你的**身份设定 | 而不是软件自带的默认人格 |
-| **20 个客户端一份口径** | 共用一份人格文本，不用各改各的 |
+| **21 个客户端一份口径** | 共用一份人格文本，不用各改各的 |
 | **当场能自证** | 发一句固定口令验证真载入，不靠「感觉好像生效了」 |
 | **随时能还原** | `--revert` 回官方原版，改前备份一直都在 |
 
@@ -42,6 +44,7 @@
 | 目标 | 说明 |
 |---|---|
 | `dsh` | DeepSeek Harness（Desktop / npm 全局 / npx 缓存 / 便携版） |
+| `teleagent` | TeleAgent 星辰超级智能体（中电信；账号记忆目录下的 `memory/USER.md`，随 system prompt 注入） |
 | `wb` | WorkBuddy 国内版（模板 + 账号级云记忆） |
 | `wbintl` | WorkBuddy 国际版（`WorkBuddyAI.exe`） |
 | `zcode` | ZCode（`AGENTS.md` / Memory / 技能 / 可选 cjs 系统提示词） |
@@ -102,7 +105,7 @@ python src/pojia_gui.py                  # 只起图形界面（本机网页）
 在客户端**新会话**里单独发一句 `破甲自检`（整条消息只有这四个字），只回一行就说明人格真载入了：
 
 ```
-破甲已生效｜版本1.04.3-beta｜仓库地址：https://github.com/Mladery/pojia-modifier
+破甲已生效｜版本1.05.0-beta｜仓库地址：https://github.com/GodPang/pojia-modifier
 ```
 
 回复带解释、加戏或拒答 → 人格没生效，先确认目标已**重启**（改的是磁盘文件，运行中的进程不会重读）。
@@ -150,7 +153,7 @@ Linux 上自动往应用菜单里放一项；装的时候问要不要把 `~/.loc
 | macOS Intel | `pojia-modifier-macos-x64-installer.command` | `pojia-modifier-macos-x64` |
 | macOS Apple Silicon | `pojia-modifier-macos-arm64-installer.command` | `pojia-modifier-macos-arm64` |
 
-在 [Actions](https://github.com/Mladery/pojia-modifier/actions/workflows/build.yml) 最新一次运行的 Artifacts 里下；tag 版本在 [Releases](https://github.com/Mladery/pojia-modifier/releases)。用法和脚本一致，把 `python pojia.py` 换成可执行文件即可；人格文件、`state/`、日志都跟着可执行文件走（安装版则在装目录里）。
+在 [Actions](https://github.com/GodPang/pojia-modifier/actions/workflows/build.yml) 最新一次运行的 Artifacts 里下；tag 版本在 [Releases](https://github.com/GodPang/pojia-modifier/releases)。用法和脚本一致，把 `python pojia.py` 换成可执行文件即可；人格文件、`state/`、日志都跟着可执行文件走（安装版则在装目录里）。
 
 三点先说：macOS 首次要 `xattr -d com.apple.quarantine`；Windows Defender 可能对单文件 exe 误报（要绝对干净就用源码跑，或用安装版——它不在临时目录里解包，误报少得多）；不带参数双击就进图形界面，想看命令行菜单加 `--menu`。
 
@@ -159,8 +162,8 @@ Linux 上自动往应用菜单里放一项；装的时候问要不要把 `~/.loc
 ## 校验
 
 ```
-3ae0d6c07376bc641dba42d16855a019bf31fc47acf4c76d0e310c153f9c2284  src/pojia.py       (275,470 B / LF)
-64c1b4b54bea14d5dba726384f7ed2ed2fa61231120822e7eb3c3099d0dc76ee  src/pojia_gui.py   (48,034 B / LF)
+1fada34779770570e0e6c3b530d9237d711890a9fd9efcc26c27a408c80b6ff8  src/pojia.py       (407,763 B / LF)
+8305433fb5f2af3170954c35bd4d5017f715906e8cac05a13b19e4539d9cc08b  src/pojia_gui.py   (22,864 B / LF)
 ```
 
 `src/` 两份随本仓库每次改动而变，上面的值对应本版。
@@ -198,16 +201,29 @@ shasum -a 256 -c SHA256SUMS.txt    # macOS
 ```
 LICENSE                        MIT 正文 + Commons Clause
 NOTICE                         目录职责、程序结构、运行时标记
+assets/                        程序图标：多尺寸 ICO + PNG 预览（make_icon.py 生成）
 src/pojia.py                   命令行主程序（零第三方依赖）
 src/pojia_gui.py               图形界面：本机网页 UI，零依赖
 policy_src/                    策略明文：policy / overlay / hardening / echo / addenda
 tools/embed_policy.py          明文 → 嵌入常量（重跑必须字节一致）
-tools/selftest.py              20 个目标的自检
+tools/make_icon.py             图标生成：纯标准库，零依赖，重跑字节一致
+tools/selftest.py              21 个目标的自检
 tools/                         打包与发布：PyInstaller、NSIS、POSIX 安装器、签名与验签
 vendor/everything/             Everything SDK 动态库（MIT），用于直查文件索引
-tests/contract/                26 条黑盒契约
+tests/contract/                黑盒契约（含 teleagent 的 6 条）
 docs/                          行为规格、免责声明、研发缘由、界面截图
 ```
+
+### 图标
+
+程序图标由 `tools/make_icon.py` 用纯标准库绘制（`zlib` / `struct`，不依赖 Pillow），风格对齐界面配色：深蓝圆角方块 + 米白盾牌 + 斜向裂缝。改了配色或形状后重跑，输出字节一致：
+
+```bash
+python tools/make_icon.py                   # 重生成 assets/pojia-modifier.ico 与 icon-preview.png
+python tools/build_exe.py --no-cython       # 重新打包，自动带上 assets/ 里的图标
+```
+
+`build_exe.py` 默认用仓库自带图标，也可用 `--icon PATH.ico` 指定别的；GUI 页面另用一份同款内联 SVG favicon（零额外文件）。
 
 跑测试只需要 pytest（脚本本身零依赖），全部在临时目录里操作，**不碰真实的 `~`**：
 
@@ -236,11 +252,12 @@ python tools/embed_policy.py && git status --porcelain   # 必须为空
 
 ## 致谢
 
-[![贡献者](https://contrib.rocks/image?repo=Mladery/pojia-modifier)](https://github.com/Mladery/pojia-modifier/graphs/contributors)
+[![贡献者](https://contrib.rocks/image?repo=GodPang/pojia-modifier)](https://github.com/GodPang/pojia-modifier/graphs/contributors)
 
 按并入主线的时间排序，只列代码与文档改动。头像墙按提交记录自动更新，新名字出现即上榜。
 
 - **[zixuan203344](https://github.com/zixuan203344)** —— Reasonix、Trae CN、Qoder CN 三个目标的适配（`v1.03.3-beta`），目标数 17 → 20；一并修掉第二落点撤回后残留、技能文件 YAML 头被覆盖、旧版本块叠加三处问题。
+- **[GodPang](https://github.com/GodPang)** —— TeleAgent 目标适配（`v1.05.0-beta`），目标数 20 → 21；顺带修好 asar 头对新版 Electron 的兼容与 `asar_read_file` 的路径遍历，并设计程序图标。
 
 想加自己正在用的客户端，照着 `docs/spec/40-targets.md` 的落点表补一个类，跑一遍 `tools/selftest.py` 再提。
 
