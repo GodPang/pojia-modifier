@@ -11,6 +11,16 @@
 [![License](https://img.shields.io/badge/license-MIT%20%2B%20Commons%20Clause-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/downloads/)
 
+## 项目来源
+
+本项目基于 **[Mladery/pojia-modifier](https://github.com/Mladery/pojia-modifier)** 修改而来，保留原项目的全部能力与许可条款，在此之上做了以下增量：
+
+- **新增 TeleAgent 支持**（`v1.05.0-beta`）：适配中电信「星辰超级智能体」，落点为其账号记忆目录下的 `memory/USER.md`，目标数从 20 增至 **21**。
+- **asar 解析兼容**：修复新版 Electron 的 asar 头格式解析，并修正 `asar_read_file` 的路径遍历问题。
+- **程序图标**：新增深蓝盾牌配斜裂缝的图标（ICO + 内联 SVG favicon），风格对齐原界面。
+
+除以上改动外，核心机制（定位 → 备份 → 替换 → 校验 → 还原）与原项目一致。
+
 **一句话：把你电脑上 21 个 AI 客户端「自己改不到的内置提示词」，换成你自己写的那份。**
 
 | 换完之后 | 说明 |
@@ -29,7 +39,7 @@
 - **只动你自己的机器。** 读写限于本机安装目录与用户目录，不碰他人网站 / 服务器 / 账号，不修改任何服务端，不伪造请求。
 - **不是破解工具。** 不生成注册码、不伪造许可证、不绕过付费墙。它改的是你自己机器上的提示词文本。
 - **可逆、可审计。** 改前写旁路备份，`--revert` 一键还原；源码全公开，发布的 exe 由本仓库 Actions 从同一份源码构建。
-- **无后门、无遥测。** 无账号、无登录、无统计、无云控、**无静默更新** —— 从不自动下载、自动替换、自动重启。升级只有一条路：你按下「安装」（界面上的按钮 / 菜单 / `--update`）。核心流程（定位 → 备份 → 替换 → 校验 → 还原）全程离线。
+- **无后门、无遥测。** 无账号、无登录、无统计、无云控、**无静默更新** —— 从不自动下载、自动替换、自动重启。升级只有一条路：你按下「安装」（界面上的按钮 / 菜单 / `--update`）。核心流程全程离线。
 - **联网只做三件事，都只下载、都可关。** ① `--fetch-tools` 拉 busybox 与 Everything 的官方二进制；② `--git-bash` 拉 Git for Windows 安装包；③ 启动 / 打开界面时查一次「有没有新版」——只读 GitHub 公开的发布列表（`releases`，最近 30 条），不带任何本机信息、不发 query，结果缓存一天，查到了也只是一个提示加一个安装按钮。不想让它查：界面上点「以后再说」，或设置里关掉「启动时检查更新」，命令行加 `--no-update-check`。
 - **后果自负。** 按现状（AS IS）提供，无任何担保。目标客户端可能异常、更新失效、配置损坏或账号受限 —— 这些风险由使用者承担。
 
@@ -44,7 +54,7 @@
 | 目标 | 说明 |
 |---|---|
 | `dsh` | DeepSeek Harness（Desktop / npm 全局 / npx 缓存 / 便携版） |
-| `teleagent` | TeleAgent 星辰超级智能体（中电信；账号记忆目录下的 `memory/USER.md`，随 system prompt 注入） |
+| `teleagent` | **TeleAgent 星辰超级智能体**（中电信；本 fork 新增，账号记忆目录下的 `memory/USER.md`，随 system prompt 注入） |
 | `wb` | WorkBuddy 国内版（模板 + 账号级云记忆） |
 | `wbintl` | WorkBuddy 国际版（`WorkBuddyAI.exe`） |
 | `zcode` | ZCode（`AGENTS.md` / Memory / 技能 / 可选 cjs 系统提示词） |
@@ -65,40 +75,63 @@
 | `traecn` | Trae CN（`~/.trae-cn/rules/project_rules.md`，与 `trae` 分开认） |
 | `qodercn` | Qoder CN（`~/.qoder-cn/agents/purge/qodercn.md` 带 frontmatter，附 `skills/purge/SKILL.md`） |
 
-## 快速开始
+## 使用方式
 
-### 三步
+### 三步走
 
 1. **写人格** —— `--persona FILE` 指定一份文本；不给就用内置片段（`--persona-list` 看有哪些）。
 2. **先预演** —— `--dry-run --apply`，只报要改哪些文件，一个字节都不写。
 3. **再执行** —— `--apply`，改前自动旁路备份；之后 `--status` 看状态，`--revert` 还原。
 
-### 常用命令
+**先 `--dry-run`，再动手。** 所有路径都可以用 `--<目标>-dir` 手动指定，记不住就跑 `--pick <目标>` 弹窗选。不带参数直接运行（或 `--gui`）进图形界面。
+
+### 通用命令
 
 ```bash
-python src/pojia.py                      # 交互菜单
+python src/pojia.py                      # 交互菜单 / 图形界面
+python src/pojia.py --gui                # 只起图形界面（本机网页）
 python src/pojia.py --status             # 只读：所有目标查一遍
 python src/pojia.py --check              # 只读体检：含会话快照的密钥体检（脱敏）
 python src/pojia.py --diagnose           # 只读：详细取证，逐文件列出
 python src/pojia.py --dry-run --apply    # 预演，不改盘
 python src/pojia.py --apply --target wb  # 真打，只处理 WorkBuddy
-python src/pojia.py --revert --target wb # 还原
+python src/pojia.py --revert --target wb # 还原 WorkBuddy
+```
+
+### 针对 TeleAgent（本 fork 新增）
+
+TeleAgent 的定位自动读取当前登录账号（设备根 `~\.local\share\TeleAgent\current-owner.json`），落点是账号目录下 `memory\USER.md`，只处理当前账号，不碰安装目录和 `app.asar`。
+
+```bash
+python src/pojia.py --dry-run --apply --target teleagent   # 预演：确认落点
+python src/pojia.py --apply --target teleagent             # 注入（改前自动备份）
+python src/pojia.py --status --target teleagent            # 查状态
+python src/pojia.py --revert --target teleagent            # 还原到注入前
+python src/pojia.py --apply --target teleagent --teleagent-dir <账号根目录>   # 手动指定其他账号
+```
+
+注入后**完全退出 TeleAgent（含托盘）再重开**，改动才会被重新读取。用 `--teleagent-dir` 可指定 `~\.local\share\TeleAgent\users\<ownerDir>` 这样的账号根；不指定则只对当前登录账号生效。
+
+### 进阶命令
+
+```bash
 python src/pojia.py --apply --target dsh --dsh-mode preset   # DSH：不改官方文件
 python src/pojia.py --apply --target wb --full               # WorkBuddy：五层开关一次做完
 python src/pojia.py --clean-spill        # 清过期的会话快照（含明文 Key）
 python src/pojia.py --guard install      # 装运行时守卫（Windows 计划任务）
 python src/pojia.py --session-guard on   # 装 DSH 会话守卫（拒答续命 / 异常续跑，Cordis 插件）
-python src/pojia.py --check-update       # 只查有没有新版（只读，不下不装）
-python src/pojia.py --update             # 有新版就下、校验、替换
-python src/pojia.py --settings           # 看设置（更新通道 / 启动检查）
-python src/pojia.py --settings "channel=mod"   # 换通道：alpha / beta / mod
-python src/pojia.py --no-update-check    # 这次启动别查更新
-python src/pojia.py --fetch-tools        # 下 busybox / Everything 到用户目录
-python src/pojia.py                      # 不带参数 = 直接进图形界面（同 --gui）
-python src/pojia_gui.py                  # 只起图形界面（本机网页）
 ```
 
-**先 `--dry-run`，再动手。** 所有路径都可以用 `--<目标>-dir` 手动指定，记不住就跑 `--pick <目标>` 弹窗选。
+### 更新与设置
+
+```bash
+python src/pojia.py --check-update            # 只查有没有新版（只读，不下不装）
+python src/pojia.py --update                  # 有新版就下、校验、替换
+python src/pojia.py --settings                # 看设置（更新通道 / 启动检查）
+python src/pojia.py --settings "channel=mod"  # 换通道：alpha / beta / mod
+python src/pojia.py --no-update-check         # 这次启动别查更新
+python src/pojia.py --fetch-tools             # 下 busybox / Everything 到用户目录
+```
 
 ### 自证
 
@@ -153,7 +186,7 @@ Linux 上自动往应用菜单里放一项；装的时候问要不要把 `~/.loc
 | macOS Intel | `pojia-modifier-macos-x64-installer.command` | `pojia-modifier-macos-x64` |
 | macOS Apple Silicon | `pojia-modifier-macos-arm64-installer.command` | `pojia-modifier-macos-arm64` |
 
-在 [Actions](https://github.com/GodPang/pojia-modifier/actions/workflows/build.yml) 最新一次运行的 Artifacts 里下；tag 版本在 [Releases](https://github.com/GodPang/pojia-modifier/releases)。用法和脚本一致，把 `python pojia.py` 换成可执行文件即可；人格文件、`state/`、日志都跟着可执行文件走（安装版则在装目录里）。
+在 [Actions](https://github.com/GodPang/pojia-modifier/actions/workflows/build.yml) 最新一次运行的 Artifacts 里下；tag 版本在 [Releases](https://github.com/GodPang/pojia-modifier/releases)。用法和脚本一致，把 `python src/pojia.py` 换成可执行文件即可；人格文件、`state/`、日志都跟着可执行文件走（安装版则在装目录里）。
 
 三点先说：macOS 首次要 `xattr -d com.apple.quarantine`；Windows Defender 可能对单文件 exe 误报（要绝对干净就用源码跑，或用安装版——它不在临时目录里解包，误报少得多）；不带参数双击就进图形界面，想看命令行菜单加 `--menu`。
 
@@ -237,39 +270,15 @@ python -m pip install pytest && python -m pytest tests/contract -q
 python tools/embed_policy.py && git status --porcelain   # 必须为空
 ```
 
-## 参与
-
-**欢迎 PR。**
-
-提之前顺手过一遍：
-
-- `python -m pytest tests/contract -q` 全绿。改行为的 PR 请带上能复现问题的契约测试，光改代码没有测试的一律先挂着
-- 只改一个目标就只动那个类。别顺手重排整个文件 —— 格式化噪音会把真正的改动淹掉
-- 新目标适配请附客户端版本号和 `--diagnose` 输出（本机路径自己打个码）
-- 改了 `policy_src/` 记得重跑 `tools/embed_policy.py` 并把结果一起提交
-
-不写代码也帮得上忙：报一个能复现的 bug、补一段某客户端的安装路径、把 README 里过时的说明指出来，都算。
-
-## 致谢
-
-[![贡献者](https://contrib.rocks/image?repo=GodPang/pojia-modifier)](https://github.com/GodPang/pojia-modifier/graphs/contributors)
-
-按并入主线的时间排序，只列代码与文档改动。头像墙按提交记录自动更新，新名字出现即上榜。
-
-- **[zixuan203344](https://github.com/zixuan203344)** —— Reasonix、Trae CN、Qoder CN 三个目标的适配（`v1.03.3-beta`），目标数 17 → 20；一并修掉第二落点撤回后残留、技能文件 YAML 头被覆盖、旧版本块叠加三处问题。
-- **[GodPang](https://github.com/GodPang)** —— TeleAgent 目标适配（`v1.05.0-beta`），目标数 20 → 21；顺带修好 asar 头对新版 Electron 的兼容与 `asar_read_file` 的路径遍历，并设计程序图标。
-
-想加自己正在用的客户端，照着 `docs/spec/40-targets.md` 的落点表补一个类，跑一遍 `tools/selftest.py` 再提。
-
 ## 许可
 
-**MIT 正文 + Commons Clause，Copyright (c) 2026 Mladery。** 许可正文见 [LICENSE](LICENSE)，目录职责与运行时标记见 [NOTICE](NOTICE)。
+**MIT 正文 + Commons Clause，Copyright (c) 2026 Mladery。** 许可正文见 [LICENSE](LICENSE)，目录职责与运行时标记见 [NOTICE](NOTICE)。本 fork 沿用原项目许可。
 
 **免费，且不许拿它卖钱。** 自己用、公司内部用、教学研究、非营利项目集成、改了再送人 —— 都可以。卖安装包、卖「解锁版」、做付费下载站、包进付费产品或付费托管服务、收钱代部署代运维 —— 不在授权范围内。这是 [Commons Clause 1.0](https://commonsclause.com/) 的原文条件：它只从授权里排除「Sell」，其余 MIT 权利（使用、修改、再分发）原样保留。
 
 遇到有人收费：那不是官方行为，也超出了本许可；可追究的情形是未经授权收费（版权侵权）、删除或隐瞒版权与许可声明、以官方名义收费或暗示背书、使用本项目名称图标造成来源混淆。
 
-**第三方独立性。** 与 WorkBuddy / 腾讯、DeepSeek、Anthropic、OpenAI、Google、Cursor、字节跳动、Moonshot、GitHub 等均无隶属、合作、授权或背书关系。
+**第三方独立性。** 与 WorkBuddy / 腾讯、DeepSeek、Anthropic、OpenAI、Google、Cursor、字节跳动、Moonshot、GitHub、TeleAgent / 中国电信等均无隶属、合作、授权或背书关系。
 
 ## 研发缘由
 
